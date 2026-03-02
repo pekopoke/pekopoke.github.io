@@ -3,27 +3,338 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的GitHub Pages - Naviq助手</title>
+    <title>pekopoke.github.io 仓库文件展示</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        body {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f6f8fa;
+        }
+        .header {
+            margin-bottom: 30px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #24292e;
+        }
+        .header h1 {
+            color: #24292e;
+            font-size: 28px;
+        }
+        .file-list {
+            background-color: #fff;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            margin: 8px 0;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            transition: background-color 0.2s;
+        }
+        .file-item:hover {
+            background-color: #f1f1f1;
+        }
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .file-icon {
+            font-size: 24px;
+        }
+        .file-name {
+            font-size: 16px;
+            color: #0366d6;
+            text-decoration: none;
+        }
+        .file-name:hover {
+            text-decoration: underline;
+        }
+        .file-size {
+            font-size: 14px;
+            color: #586069;
+            margin-left: 10px;
+        }
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-preview {
+            background-color: #2ea44f;
+            color: #fff;
+        }
+        .btn-preview:hover {
+            background-color: #22863a;
+        }
+        .btn-download {
+            background-color: #0366d6;
+            color: #fff;
+        }
+        .btn-download:hover {
+            background-color: #005cc5;
+        }
+        .preview-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            padding: 20px;
+        }
+        .preview-content {
+            background-color: #fff;
+            border-radius: 6px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+            padding: 20px;
+        }
+        .close-preview {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 30px;
+            color: #fff;
+            cursor: pointer;
+        }
+        .preview-placeholder {
+            text-align: center;
+            padding: 40px;
+            color: #586069;
+        }
+        .image-preview {
+            max-width: 100%;
+            max-height: 80vh;
+            object-fit: contain;
+        }
+        .markdown-preview {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .pdf-preview {
+            width: 100%;
+            height: 80vh;
+            border: none;
+        }
+    </style>
 </head>
 <body>
-    <!-- 这里可以写网页的内容，比如简单的文字 -->
-    <h1>欢迎访问我的网站</h1>
-    <p>Naviq 问答助手会出现在页面右下角</p>
+    <div class="header">
+        <h1>pekopoke.github.io 仓库文件展示</h1>
+    </div>
 
-    <!-- ===== 以下是你要嵌入的 Naviq 代码 ===== -->
+    <div class="file-list" id="fileList"></div>
+
+    <!-- 预览弹窗 -->
+    <div class="preview-modal" id="previewModal">
+        <span class="close-preview" id="closePreview">&times;</span>
+        <div class="preview-content" id="previewContent"></div>
+    </div>
+
     <script>
-      window.NaviQConfig = {
-      "id": "e4e409c466aaccbcd5fcefef01eb9c14d8bea3ae87c548db68e83653118e6152",
-      "name": "Naviq 问答助手",
-      "welcome": "您好！我是 Naviq 问答助手，您可以向我提问网站内容。",
-      "theme": "colorful",
-      "accentColor": "#0F172A",
-      "size": "large",
-      "position": "bottom-right",
-      "feedback": true
-    };
+        // 仓库基础配置
+        const REPO_CONFIG = {
+            owner: 'pekopoke',
+            repo: 'pekopoke.github.io',
+            branch: 'main' // 仓库默认分支，一般是main或master
+        };
+
+        // 文件类型图标映射
+        const FILE_ICONS = {
+            image: '🖼️',
+            markdown: '📝',
+            pdf: '📄',
+            word: '📃',
+            other: '📎'
+        };
+
+        // 获取文件类型
+        function getFileType(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return 'image';
+            if (ext === 'md') return 'markdown';
+            if (ext === 'pdf') return 'pdf';
+            if (['doc', 'docx'].includes(ext)) return 'word';
+            return 'other';
+        }
+
+        // 构建Raw文件地址
+        function getRawFileUrl(path) {
+            return `https://raw.githubusercontent.com/${REPO_CONFIG.owner}/${REPO_CONFIG.repo}/${REPO_CONFIG.branch}/${path}`;
+        }
+
+        // 构建GitHub文件预览地址
+        function getGitHubPreviewUrl(path) {
+            return `https://github.com/${REPO_CONFIG.owner}/${REPO_CONFIG.repo}/blob/${REPO_CONFIG.branch}/${path}`;
+        }
+
+        // 渲染文件列表
+        function renderFileList(files) {
+            const fileListEl = document.getElementById('fileList');
+            fileListEl.innerHTML = '';
+
+            files.forEach(file => {
+                // 跳过目录，只处理文件
+                if (file.type !== 'file') return;
+
+                const fileType = getFileType(file.name);
+                const fileIcon = FILE_ICONS[fileType];
+                const fileSize = (file.size / 1024).toFixed(2);
+
+                // 创建文件项元素
+                const fileItemEl = document.createElement('div');
+                fileItemEl.className = 'file-item';
+                fileItemEl.innerHTML = `
+                    <div class="file-info">
+                        <span class="file-icon">${fileIcon}</span>
+                        <a class="file-name" href="${file.html_url}" target="_blank">${file.name}</a>
+                        <span class="file-size">${fileSize} KB</span>
+                    </div>
+                    <div class="file-actions">
+                        <button class="btn btn-preview" data-file-path="${file.path}" data-file-type="${fileType}">预览</button>
+                        <a class="btn btn-download" href="${file.download_url}" download="${file.name}">下载</a>
+                    </div>
+                `;
+
+                fileListEl.appendChild(fileItemEl);
+            });
+
+            // 绑定预览按钮事件
+            bindPreviewEvents();
+        }
+
+        // 绑定预览按钮事件
+        function bindPreviewEvents() {
+            const previewButtons = document.querySelectorAll('.btn-preview');
+            const previewModal = document.getElementById('previewModal');
+            const previewContent = document.getElementById('previewContent');
+            const closePreview = document.getElementById('closePreview');
+
+            previewButtons.forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const filePath = btn.dataset.filePath;
+                    const fileType = btn.dataset.fileType;
+                    const rawUrl = getRawFileUrl(filePath);
+
+                    // 清空预览内容
+                    previewContent.innerHTML = '<div class="preview-placeholder">加载中...</div>';
+                    previewModal.style.display = 'flex';
+
+                    // 根据文件类型渲染预览
+                    try {
+                        switch (fileType) {
+                            case 'image':
+                                previewContent.innerHTML = `<img src="${rawUrl}" class="image-preview" alt="${filePath}">`;
+                                break;
+                            case 'markdown':
+                                const mdResponse = await fetch(rawUrl);
+                                const mdContent = await mdResponse.text();
+                                const htmlContent = marked.parse(mdContent);
+                                previewContent.innerHTML = `<div class="markdown-preview">${htmlContent}</div>`;
+                                break;
+                            case 'pdf':
+                                // PDF预览使用Google文档查看器（需外网）或直接嵌入
+                                previewContent.innerHTML = `
+                                    <iframe class="pdf-preview" src="${rawUrl}" type="application/pdf">
+                                        您的浏览器不支持PDF预览，<a href="${rawUrl}" target="_blank">点击查看</a>
+                                    </iframe>
+                                `;
+                                break;
+                            case 'word':
+                                // Word文件无法直接预览，跳转到GitHub预览或使用第三方预览
+                                previewContent.innerHTML = `
+                                    <div class="preview-placeholder">
+                                        <p>Word文件无法直接预览</p>
+                                        <p>
+                                            <a href="${getGitHubPreviewUrl(filePath)}" target="_blank">在GitHub中查看</a> 
+                                            或 
+                                            <a href="${rawUrl}" download>下载文件</a>
+                                        </p>
+                                    </div>
+                                `;
+                                break;
+                            default:
+                                previewContent.innerHTML = `
+                                    <div class="preview-placeholder">
+                                        <p>不支持该文件类型预览</p>
+                                        <p><a href="${rawUrl}" target="_blank">点击查看原始文件</a></p>
+                                    </div>
+                                `;
+                        }
+                    } catch (error) {
+                        previewContent.innerHTML = `
+                            <div class="preview-placeholder">
+                                <p>预览失败：${error.message}</p>
+                                <p><a href="${rawUrl}" target="_blank">点击查看原始文件</a></p>
+                            </div>
+                        `;
+                        console.error('预览失败:', error);
+                    }
+                });
+            });
+
+            // 关闭预览弹窗
+            closePreview.addEventListener('click', () => {
+                previewModal.style.display = 'none';
+            });
+
+            // 点击弹窗外层关闭
+            window.addEventListener('click', (e) => {
+                if (e.target === previewModal) {
+                    previewModal.style.display = 'none';
+                }
+            });
+        }
+
+        // 初始化：获取仓库文件列表
+        async function init() {
+            try {
+                const apiUrl = `https://api.github.com/repos/${REPO_CONFIG.owner}/${REPO_CONFIG.repo}/contents/`;
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`请求失败 (${response.status}): ${response.statusText}`);
+                }
+
+                const files = await response.json();
+                renderFileList(files);
+            } catch (error) {
+                document.getElementById('fileList').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #cb2431;">
+                        加载文件列表失败：${error.message}
+                    </div>
+                `;
+                console.error('初始化失败:', error);
+            }
+        }
+
+        // 启动程序
+        init();
     </script>
-    <script src="https://staging.mineru.org.cn/naviq/widgets/widget.js?v=39" async></script>
-    <!-- ===== Naviq 代码结束 ===== -->
 </body>
 </html>
