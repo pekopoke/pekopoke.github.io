@@ -32,6 +32,7 @@
             border-radius: 6px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             padding: 20px;
+            margin-bottom: 30px;
         }
         .file-item {
             display: flex;
@@ -61,11 +62,6 @@
         }
         .file-name:hover {
             text-decoration: underline;
-        }
-        .file-size {
-            font-size: 14px;
-            color: #586069;
-            margin-left: 10px;
         }
         .file-actions {
             display: flex;
@@ -141,6 +137,11 @@
             height: 80vh;
             border: none;
         }
+        .error-tip {
+            text-align: center;
+            padding: 40px;
+            color: #cb2431;
+        }
     </style>
 </head>
 <body>
@@ -148,7 +149,9 @@
         <h1>pekopoke.github.io 仓库文件展示</h1>
     </div>
 
-    <div class="file-list" id="fileList"></div>
+    <div class="file-list" id="fileList">
+        <!-- 文件列表会自动渲染 -->
+    </div>
 
     <!-- 预览弹窗 -->
     <div class="preview-modal" id="previewModal">
@@ -157,184 +160,152 @@
     </div>
 
     <script>
-        // 仓库基础配置
-        const REPO_CONFIG = {
+        // ========== 1. 配置仓库和文件（重点修改这里） ==========
+        const CONFIG = {
             owner: 'pekopoke',
             repo: 'pekopoke.github.io',
-            branch: 'main' // 仓库默认分支，一般是main或master
+            branch: 'main',
+            // 手动配置你仓库里的文件列表（解决API 403问题）
+            // 格式：{name: '文件名', type: '文件类型(image/markdown/pdf/word/other)'}
+            files: [
+                // 示例：替换成你实际的文件，删掉不需要的示例
+                {name: 'README.md', type: 'markdown'},
+                {name: 'photo.png', type: 'image'},
+                {name: 'document.pdf', type: 'pdf'},
+                {name: 'resume.docx', type: 'word'},
+                // 继续添加你的文件...
+            ]
         };
 
-        // 文件类型图标映射
-        const FILE_ICONS = {
-            image: '🖼️',
-            markdown: '📝',
-            pdf: '📄',
-            word: '📃',
-            other: '📎'
-        };
-
-        // 获取文件类型
-        function getFileType(filename) {
-            const ext = filename.split('.').pop().toLowerCase();
-            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return 'image';
-            if (ext === 'md') return 'markdown';
-            if (ext === 'pdf') return 'pdf';
-            if (['doc', 'docx'].includes(ext)) return 'word';
-            return 'other';
+        // ========== 2. 工具函数 ==========
+        // 文件类型图标
+        const FILE_ICONS = {image: '🖼️', markdown: '📝', pdf: '📄', word: '📃', other: '📎'};
+        // 构建原始文件链接
+        function getRawUrl(filename) {
+            return `https://raw.githubusercontent.com/${CONFIG.owner}/${CONFIG.repo}/${CONFIG.branch}/${filename}`;
+        }
+        // 构建下载链接
+        function getDownloadUrl(filename) {
+            return `https://raw.githubusercontent.com/${CONFIG.owner}/${CONFIG.repo}/${CONFIG.branch}/${filename}`;
+        }
+        // 构建GitHub预览链接
+        function getGitHubUrl(filename) {
+            return `https://github.com/${CONFIG.owner}/${CONFIG.repo}/blob/${CONFIG.branch}/${filename}`;
         }
 
-        // 构建Raw文件地址
-        function getRawFileUrl(path) {
-            return `https://raw.githubusercontent.com/${REPO_CONFIG.owner}/${REPO_CONFIG.repo}/${REPO_CONFIG.branch}/${path}`;
-        }
-
-        // 构建GitHub文件预览地址
-        function getGitHubPreviewUrl(path) {
-            return `https://github.com/${REPO_CONFIG.owner}/${REPO_CONFIG.repo}/blob/${REPO_CONFIG.branch}/${path}`;
-        }
-
-        // 渲染文件列表
-        function renderFileList(files) {
+        // ========== 3. 渲染文件列表 ==========
+        function renderFileList() {
             const fileListEl = document.getElementById('fileList');
-            fileListEl.innerHTML = '';
+            if (CONFIG.files.length === 0) {
+                fileListEl.innerHTML = '<div class="error-tip">请先在CONFIG.files中配置你的文件列表</div>';
+                return;
+            }
 
-            files.forEach(file => {
-                // 跳过目录，只处理文件
-                if (file.type !== 'file') return;
-
-                const fileType = getFileType(file.name);
-                const fileIcon = FILE_ICONS[fileType];
-                const fileSize = (file.size / 1024).toFixed(2);
-
-                // 创建文件项元素
-                const fileItemEl = document.createElement('div');
-                fileItemEl.className = 'file-item';
-                fileItemEl.innerHTML = `
-                    <div class="file-info">
-                        <span class="file-icon">${fileIcon}</span>
-                        <a class="file-name" href="${file.html_url}" target="_blank">${file.name}</a>
-                        <span class="file-size">${fileSize} KB</span>
-                    </div>
-                    <div class="file-actions">
-                        <button class="btn btn-preview" data-file-path="${file.path}" data-file-type="${fileType}">预览</button>
-                        <a class="btn btn-download" href="${file.download_url}" download="${file.name}">下载</a>
+            let html = '';
+            CONFIG.files.forEach(file => {
+                const icon = FILE_ICONS[file.type] || FILE_ICONS.other;
+                html += `
+                    <div class="file-item">
+                        <div class="file-info">
+                            <span class="file-icon">${icon}</span>
+                            <a class="file-name" href="${getGitHubUrl(file.name)}" target="_blank">${file.name}</a>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-preview" data-name="${file.name}" data-type="${file.type}">预览</button>
+                            <a class="btn btn-download" href="${getDownloadUrl(file.name)}" download="${file.name}">下载</a>
+                        </div>
                     </div>
                 `;
-
-                fileListEl.appendChild(fileItemEl);
             });
-
-            // 绑定预览按钮事件
-            bindPreviewEvents();
+            fileListEl.innerHTML = html;
+            bindPreviewEvents(); // 绑定预览事件
         }
 
-        // 绑定预览按钮事件
+        // ========== 4. 预览功能 ==========
         function bindPreviewEvents() {
-            const previewButtons = document.querySelectorAll('.btn-preview');
             const previewModal = document.getElementById('previewModal');
             const previewContent = document.getElementById('previewContent');
-            const closePreview = document.getElementById('closePreview');
+            const closeBtn = document.getElementById('closePreview');
 
-            previewButtons.forEach(btn => {
+            // 预览按钮点击事件
+            document.querySelectorAll('.btn-preview').forEach(btn => {
                 btn.addEventListener('click', async () => {
-                    const filePath = btn.dataset.filePath;
-                    const fileType = btn.dataset.fileType;
-                    const rawUrl = getRawFileUrl(filePath);
+                    const filename = btn.dataset.name;
+                    const fileType = btn.dataset.type;
+                    const rawUrl = getRawUrl(filename);
 
-                    // 清空预览内容
                     previewContent.innerHTML = '<div class="preview-placeholder">加载中...</div>';
                     previewModal.style.display = 'flex';
 
-                    // 根据文件类型渲染预览
                     try {
                         switch (fileType) {
                             case 'image':
-                                previewContent.innerHTML = `<img src="${rawUrl}" class="image-preview" alt="${filePath}">`;
+                                previewContent.innerHTML = `<img src="${rawUrl}" class="image-preview" alt="${filename}">`;
                                 break;
                             case 'markdown':
-                                const mdResponse = await fetch(rawUrl);
-                                const mdContent = await mdResponse.text();
-                                const htmlContent = marked.parse(mdContent);
-                                previewContent.innerHTML = `<div class="markdown-preview">${htmlContent}</div>`;
+                                const res = await fetch(rawUrl);
+                                const mdContent = await res.text();
+                                previewContent.innerHTML = `<div class="markdown-preview">${marked.parse(mdContent)}</div>`;
                                 break;
                             case 'pdf':
-                                // PDF预览使用Google文档查看器（需外网）或直接嵌入
                                 previewContent.innerHTML = `
                                     <iframe class="pdf-preview" src="${rawUrl}" type="application/pdf">
-                                        您的浏览器不支持PDF预览，<a href="${rawUrl}" target="_blank">点击查看</a>
+                                        浏览器不支持PDF预览，<a href="${rawUrl}" target="_blank">点击查看</a>
                                     </iframe>
                                 `;
                                 break;
                             case 'word':
-                                // Word文件无法直接预览，跳转到GitHub预览或使用第三方预览
                                 previewContent.innerHTML = `
                                     <div class="preview-placeholder">
                                         <p>Word文件无法直接预览</p>
-                                        <p>
-                                            <a href="${getGitHubPreviewUrl(filePath)}" target="_blank">在GitHub中查看</a> 
-                                            或 
-                                            <a href="${rawUrl}" download>下载文件</a>
-                                        </p>
+                                        <a href="${getGitHubUrl(filename)}" target="_blank">在GitHub查看</a> | 
+                                        <a href="${rawUrl}" download>下载文件</a>
                                     </div>
                                 `;
                                 break;
                             default:
                                 previewContent.innerHTML = `
                                     <div class="preview-placeholder">
-                                        <p>不支持该文件类型预览</p>
-                                        <p><a href="${rawUrl}" target="_blank">点击查看原始文件</a></p>
+                                        <p>不支持该类型预览</p>
+                                        <a href="${rawUrl}" target="_blank">查看原始文件</a>
                                     </div>
                                 `;
                         }
-                    } catch (error) {
+                    } catch (e) {
                         previewContent.innerHTML = `
                             <div class="preview-placeholder">
-                                <p>预览失败：${error.message}</p>
-                                <p><a href="${rawUrl}" target="_blank">点击查看原始文件</a></p>
+                                <p>预览失败：${e.message}</p>
+                                <a href="${rawUrl}" target="_blank">点击查看</a>
                             </div>
                         `;
-                        console.error('预览失败:', error);
                     }
                 });
             });
 
-            // 关闭预览弹窗
-            closePreview.addEventListener('click', () => {
-                previewModal.style.display = 'none';
-            });
-
-            // 点击弹窗外层关闭
+            // 关闭预览
+            closeBtn.addEventListener('click', () => previewModal.style.display = 'none');
             window.addEventListener('click', (e) => {
-                if (e.target === previewModal) {
-                    previewModal.style.display = 'none';
-                }
+                if (e.target === previewModal) previewModal.style.display = 'none';
             });
         }
 
-        // 初始化：获取仓库文件列表
-        async function init() {
-            try {
-                const apiUrl = `https://api.github.com/repos/${REPO_CONFIG.owner}/${REPO_CONFIG.repo}/contents/`;
-                const response = await fetch(apiUrl);
-                
-                if (!response.ok) {
-                    throw new Error(`请求失败 (${response.status}): ${response.statusText}`);
-                }
-
-                const files = await response.json();
-                renderFileList(files);
-            } catch (error) {
-                document.getElementById('fileList').innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: #cb2431;">
-                        加载文件列表失败：${error.message}
-                    </div>
-                `;
-                console.error('初始化失败:', error);
-            }
-        }
-
-        // 启动程序
-        init();
+        // ========== 5. 初始化 ==========
+        renderFileList();
     </script>
+
+    <!-- ========== 6. 重新集成Naviq问答助手（恢复助手显示） ========== -->
+    <script>
+        window.NaviQConfig = {
+        "id": "e4e409c466aaccbcd5fcefef01eb9c14d8bea3ae87c548db68e83653118e6152",
+        "name": "Naviq 问答助手",
+        "welcome": "您好！我是 Naviq 问答助手，您可以向我提问网站内容。",
+        "theme": "colorful",
+        "accentColor": "#0F172A",
+        "size": "large",
+        "position": "bottom-right",
+        "feedback": true
+        };
+    </script>
+    <script src="https://staging.mineru.org.cn/naviq/widgets/widget.js?v=39" async></script>
 </body>
 </html>
